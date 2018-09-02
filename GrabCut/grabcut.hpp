@@ -19,7 +19,7 @@ const int k = 5;
 class GrabCut {
     float gma = 50.f;
     float pi[2][k];
-    float eps = 1e-4f;
+    float eps = 1e-7f;
     Vec3f mean[2][k];
     Mat cov[2][k];
     Mat img, labels, fg_components, bg_components;

@@ -282,7 +282,7 @@ void GrabCut::estimate_segmentation() {
             }
         }
     }
-    Mat tmp;
+//    Mat tmp;
 //    labels.convertTo(tmp, CV_8U, 255);
 //    imshow("labels", tmp);
 //    waitKey(30);

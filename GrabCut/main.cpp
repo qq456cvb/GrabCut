@@ -95,8 +95,8 @@ void mouseHandler(int event, int x, int y, int flags, void* param)
 int main()
 {
 //    test();
-    auto img = imread("./data_GT/scissors.jpg");
-    resize(img, img, Size(img.cols / 2, img.rows / 2));
+    auto img = imread("./data_GT/flower.jpg");
+    resize(img, img, Size(img.cols, img.rows));
     imshow("img", img);
     cv::setMouseCallback("img",mouseHandler,&img);
     waitKey();
