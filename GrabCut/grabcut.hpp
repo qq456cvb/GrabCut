@@ -28,6 +28,7 @@ class GrabCut {
 public:
     void init(Mat img, Rect rect);
     void init_gaussian(Rect rect);
+//    void kmean_initialization();
     void assign_GMM_components();
     void update_GMM_params();
     void estimate_segmentation();

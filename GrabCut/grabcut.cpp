@@ -16,7 +16,7 @@
 #include <limits.h>
 
 
-void calcGaussians(Mat img, Mat mask, Mat labels, int target, Vec3f &mean, Mat &cov, int &cnt, int label_target=-1) {
+void calcGaussians(Mat img, Mat mask, Mat labels, int target, Vec3f &mean, Mat &cov, int &cnt, int label_target = -1, bool need_cov = true) {
     mean = 0;
     cnt = 0;
     float *img_ptr = (float *)img.data;
@@ -31,18 +31,19 @@ void calcGaussians(Mat img, Mat mask, Mat labels, int target, Vec3f &mean, Mat &
         }
     }
     // get fg and bg cov
-    cov = Mat(3, 3, CV_32F, Scalar(0));
-    cnt = 0;
-    for (int i = 0; i < img.rows; i++) {
-        for (int j = 0; j < img.cols; j++) {
-            if (mask_ptr[i * img.cols + j] == target && (label_target < 0 || label_ptr[i * img.cols + j] == label_target)) {
-                Mat tmp = Mat(Vec3f(&img_ptr[(i * img.cols + j) * 3]) - mean);
-                cov += 1. / (++cnt) * (tmp * tmp.t() - cov);
+    if (need_cov) {
+        cov = Mat(3, 3, CV_32F, Scalar(0));
+        cnt = 0;
+        for (int i = 0; i < img.rows; i++) {
+            for (int j = 0; j < img.cols; j++) {
+                if (mask_ptr[i * img.cols + j] == target && (label_target < 0 || label_ptr[i * img.cols + j] == label_target)) {
+                    Mat tmp = Mat(Vec3f(&img_ptr[(i * img.cols + j) * 3]) - mean);
+                    cov += 1. / (++cnt) * (tmp * tmp.t() - cov);
+                }
             }
         }
     }
 }
-
 
 void GrabCut::init(cv::Mat img, cv::Rect rect) {
     this->rect = rect;
@@ -73,34 +74,6 @@ void GrabCut::init_gaussian(Rect rect) {
     int fg_cnt, bg_cnt;
     calcGaussians(img, labels, Mat(), 0, bg_mean, bg_cov, bg_cnt);
     calcGaussians(img, labels, Mat(), 1, fg_mean, fg_cov, fg_cnt);
-//    Vec3f fg_mean = 0, bg_mean = 0;
-//    int fg_cnt = 0, bg_cnt = 0;
-//    float *img_ptr = (float *)this->img.data;
-//    uchar *label_ptr = (uchar *)labels.data;
-//    for (int i = 0; i < img.rows; i++) {
-//        for (int j = 0; j < img.cols; j++) {
-//            if (label_ptr[i * img.cols + j] == 1) {
-//                fg_mean += 1. / (++fg_cnt) * (Vec3f(&img_ptr[(i * img.cols + j) * 3]) - fg_mean);
-//            } else {
-//                bg_mean += 1. / (++bg_cnt) * (Vec3f(&img_ptr[(i * img.cols + j) * 3]) - bg_mean);
-//            }
-//        }
-//    }
-//    // get fg and bg cov
-//    Mat fg_cov(3, 3, CV_32F, Scalar(0)), bg_cov(3, 3, CV_32F, Scalar(0));
-//    fg_cnt = 0;
-//    bg_cnt = 0;
-//    for (int i = 0; i < img.rows; i++) {
-//        for (int j = 0; j < img.cols; j++) {
-//            if (label_ptr[i * img.cols + j] == 1) {
-//                Mat tmp = Mat(Vec3f(&img_ptr[(i * img.cols + j) * 3]) - fg_mean);
-//                fg_cov += 1. / (++fg_cnt) * (tmp * tmp.t() - fg_cov);
-//            } else {
-//                Mat tmp = Mat(Vec3f(&img_ptr[(i * img.cols + j) * 3]) - bg_mean);
-//                bg_cov += 1. / (++bg_cnt) * (tmp * tmp.t() - bg_cov);
-//            }
-//        }
-//    }
     cout << fg_mean << endl;
     cout << bg_mean << endl;
     cout << fg_cov << endl;
@@ -123,10 +96,60 @@ void GrabCut::init_gaussian(Rect rect) {
         i++;
     }
     
-    for (int i = 0; i < k; i++) {
-        pi[0][i] = 1.f / k;
-        pi[1][i] = 1.f / k;
+    float *img_ptr = (float *)img.data;
+    int max_iter = 100;
+    for (int l = 0; l < 2; l++) {
+        for (int it = 0; it < max_iter; it++) {
+            float diff = 0;
+            Mat assignment(img.rows, img.cols, CV_8U, Scalar(255));
+            uchar *assign_ptr = assignment.data;
+            for (int i = 0; i < img.rows; i++) {
+                for (int j = 0; j < img.cols; j++) {
+                    if ((j >= rect.x && j < rect.x + rect.width && i >= rect.y && i < rect.y + rect.height) ^ (l == 0)) {
+                        float min_dist = numeric_limits<float>::max();
+                        int min_n = -1;
+                        for (int n = 0; n < k; n++) {
+                            Vec3f tmp = Vec3f(&img_ptr[3 * (i * img.cols + j)]) - mean[l][n];
+                            float dist = tmp.dot(tmp);
+                            if (dist < min_dist) {
+                                min_dist = dist;
+                                min_n = n;
+                            }
+                        }
+                        assign_ptr[i * img.cols + j] = min_n;
+                    }
+                }
+            }
+            int cnts = 0;
+            for (int n = 0; n < k; n++) {
+                Mat cov;
+                int cnt;
+                Vec3f mean_old = Vec3f(mean[l][n][0], mean[l][n][1], mean[l][n][2]);
+                calcGaussians(img, assignment, Mat(), n, mean[l][n], cov, cnt, -1, false);
+                diff += (mean_old - mean[l][n]).dot(mean_old - mean[l][n]);
+                pi[l][n] = cnt;
+                cnts += cnt;
+            }
+            for (int n = 0; n < k; n++) {
+                pi[l][n] /= float(cnts);
+//                cout << pi[l][n] << endl;
+            }
+            if (diff < 1e-4f || it == max_iter - 1) {
+                cout << "kmeans converged after " << it << " iterations" << endl;
+                for (int n = 0; n < k; n++) {
+                    Mat cov;
+                    int cnt;
+                    calcGaussians(img, assignment, Mat(), n, mean[l][n], cov, cnt, -1, false);
+                }
+                break;
+            }
+        }
     }
+    
+//    for (int i = 0; i < k; i++) {
+//        pi[0][i] = 1.f / k;
+//        pi[1][i] = 1.f / k;
+//    }
 }
 
 void GrabCut::assign_GMM_components() {
