@@ -17,13 +17,19 @@ using namespace std;
 const int k = 5;
 
 class GrabCut {
-    float pi[k * 2];
-    Vec3f mean[k * 2];
-    Mat cov[k * 2];
-    Mat img, labels, components;
+    float gma = 50.f;
+    float pi[2][k];
+    float eps = 1e-4f;
+    Vec3f mean[2][k];
+    Mat cov[2][k];
+    Mat img, labels, fg_components, bg_components;
+    Rect rect;
     
 public:
     void init(Mat img, Rect rect);
     void init_gaussian(Rect rect);
+    void assign_GMM_components();
+    void update_GMM_params();
+    void estimate_segmentation();
 };
 #endif /* grabcut_hpp */

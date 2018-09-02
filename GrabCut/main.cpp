@@ -13,13 +13,13 @@ a minimum cut on the following graph:
 
         SOURCE
         /             \
-    1/                \2
-    /       3           \
+    2/                \9
+    /       1           \
 node0 -----> node1
     |   <-----      |
-    |      4         |
+    |      2         |
     \                /
-    5\            /6
+    5\            /4
         \        /
         SINK
 
@@ -38,9 +38,11 @@ void test() {
     g -> add_node();
     g -> add_node();
     
-    g -> add_tweights( 0,   /* capacities */  1, 5 );
-    g -> add_tweights( 1,   /* capacities */  2, 6 );
-    g -> add_edge( 0, 1,    /* capacities */  3, 4 );
+    g -> add_tweights( 0,   /* capacities */  2, 5 );
+    g -> add_tweights( 1,   /* capacities */  9, 4 );
+    g -> add_edge( 0, 1,    /* capacities */  1, 0 );
+    g -> add_edge( 1, 0,    /* capacities */  2, 0 );
+//    g -> add_edge( 1, 0,    /* capacities */  0, 3 );
     
     int flow = g -> maxflow();
     
@@ -92,10 +94,12 @@ void mouseHandler(int event, int x, int y, int flags, void* param)
 
 int main()
 {
-    auto img = imread("./data_GT/banana1.bmp");
+//    test();
+    auto img = imread("./data_GT/scissors.jpg");
+    resize(img, img, Size(img.cols / 2, img.rows / 2));
     imshow("img", img);
     cv::setMouseCallback("img",mouseHandler,&img);
-    auto key = waitKey();
+    waitKey();
     
     return 0;
 }
